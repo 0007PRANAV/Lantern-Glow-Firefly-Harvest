@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lantern Glow: Firefly Harvest</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            background-color: #0f172a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            padding: 10px;
+        }
+        #game-container {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            /* Adaptive height to ensure background visibility on all mobile/desktop ratios */
+            height: 100%;
+            aspect-ratio: 9 / 16; 
+            max-height: 85vh;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+            border-radius: 20px;
+            overflow: hidden;
+            border: 4px solid #334155;
+            
+            /* FIXED BACKGROUND VISIBILITY USING contain TO KEEP IMAGE FULLY VISIBLE */
+            background-image: url('IMG_20260703_224812_264.jpg'), url('https://images.unsplash.com/photo-1502082553048-f009c37129b9?q=80&w=1000'); 
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+        }
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+        /* UI Overlay styles */
+        .ui-element {
+            position: absolute;
+            z-index: 2;
+            color: #1e293b;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(255,255,255,0.8);
+        }
+        #score-board {
+            top: 15px;
+            left: 15px;
+            font-size: 1.25rem;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 6px 16px;
+            border-radius: 20px;
+            backdrop-filter: blur(6px);
+        }
+        #fuel-container {
+            top: 15px;
+            right: 15px;
+            width: 120px;
+            background: rgba(0, 0, 0, 0.4);
+            border: 2px solid #ffffff;
+            border-radius: 10px;
+            height: 24px;
+            overflow: hidden;
+        }
+        #fuel-bar {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, #eab308, #facc15);
+            transition: width 0.1s linear;
+        }
+        #screen-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 3;
+            background: rgba(15, 23, 42, 0.75);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            text-align: center;
+            padding: 30px;
+            backdrop-filter: blur(6px);
+        }
+        h1 {
+            font-size: 2.2rem;
+            margin-bottom: 12px;
+            color: #fef08a;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.7);
+        }
+        p {
+            font-size: 0.95rem;
+            margin-bottom: 25px;
+            line-height: 1.5;
+            color: #e2e8f0;
+        }
+        .btn {
+            background: #eab308;
+            color: #0f172a;
+            border: none;
+            padding: 14px 35px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            border-radius: 30px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(234, 179, 8, 0.4);
+            transition: transform 0.2s, background-color 0.2s;
+        }
+        .btn:hover {
+            transform: scale(1.05);
+            background: #facc15;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div id="score-board" class="ui-element">Score: <span id="score">0</span></div>
+        <div id="fuel-container" class="ui-element">
+            <div id="fuel-bar"></div>
+        </div>
+
+        <canvas id="gameCanvas"></canvas>
+
+        <div id="screen-overlay">
+            <h1 id="overlay-title">Lantern Glow</h1>
+            <p id="overlay-desc">Fireflies are hiding near the branches! Tap the bright glowing fireflies to recharge the lantern before its energy runs out. Avoid clicking the dark shadow moths!</p>
+            <button id="action-btn" class="btn">Start Harvest</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreEl = document.getElementById('score');
+        const fuelBar = document.getElementById('fuel-bar');
+        const screenOverlay = document.getElementById('screen-overlay');
+        const overlayTitle = document.getElementById('overlay-title');
+        const overlayDesc = document.getElementById('overlay-desc');
+        const actionBtn = document.getElementById('action-btn');
+
+        let score = 0;
+        let fuel = 100;
+        let gameActive = false;
+        let bugs = [];
+        let particles = [];
+        let spawnTimer = 0;
+
+        function resizeCanvas() {
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        class Bug {
+            constructor() {
+                // Adjusting coordinate systems dynamically to fit any aspect ratio size perfectly
+                this.x = Math.random() * (canvas.width * 0.5);
+                this.y = canvas.height * 0.2 + (Math.random() * (canvas.height * 0.4));
+                this.radius = Math.random() * 5 + 9;
+                
+                // Targets center-right quadrant
+                const targetX = canvas.width * 0.75;
+                const targetY = canvas.height * 0.35;
+                
+                const angle = Math.atan2(targetY - this.y, targetX - this.x);
+                const speed = Math.random() * 1.2 + 0.8;
+                
+                this.vx = Math.cos(angle) * speed;
+                this.vy = Math.sin(angle) * speed;
+                
+                this.type = Math.random() > 0.25 ? 'firefly' : 'moth';
+                this.pulse = Math.random() * Math.PI;
+            }
+
+            update() {
+                this.pulse += 0.05;
+                this.x += this.vx + Math.sin(this.pulse) * 0.2;
+                this.y += this.vy + Math.cos(this.pulse) * 0.2;
+            }
+
+            draw() {
+                ctx.beginPath();
+                if (this.type === 'firefly') {
+                    const glowRadius = this.radius * (1.6 + Math.sin(this.pulse) * 0.4);
+                    let grad = ctx.createRadialGradient(this.x, this.y, 2, this.x, this.y, glowRadius);
+                    grad.addColorStop(0, '#ffffff');
+                    grad.addColorStop(0.3, '#fef08a');
+                    grad.addColorStop(1, 'rgba(254, 240, 138, 0)');
+                    ctx.fillStyle = grad;
+                    ctx.arc(this.x, this.y, glowRadius, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.beginPath();
+                    ctx.fillStyle = '#f59e0b';
+                    ctx.arc(this.x, this.y, this.radius * 0.4, 0, Math.PI * 2);
+                    ctx.fill();
+                } else {
+                    ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+                    ctx.arc(this.x, this.y, this.radius * 0.6, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    ctx.beginPath();
+                    ctx.fillStyle = '#ef4444';
+                    ctx.arc(this.x, this.y, 2.5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        }
+
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.vx = (Math.random() - 0.5) * 5;
+                this.vy = (Math.random() - 0.5) * 5;
+                this.alpha = 1;
+                this.radius = Math.random() * 3 + 1.5;
+            }
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.alpha -= 0.04;
+            }
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = this.alpha;
+                ctx.beginPath();
+                ctx.fillStyle = this.color;
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        function createBurst(x, y, color) {
+            for (let i = 0; i < 10; i++) {
+                particles.push(new Particle(x, y, color));
+            }
+        }
+
+        function handleInteraction(clientX, clientY) {
+            if (!gameActive) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const clickX = clientX - rect.left;
+            const clickY = clientY - rect.top;
+
+            for (let i = bugs.length - 1; i >= 0; i--) {
+                const bug = bugs[i];
+                const dist = Math.hypot(clickX - bug.x, clickY - bug.y);
+                
+                if (dist < bug.radius + 24) {
+                    if (bug.type === 'firefly') {
+                        score += 10;
+                        fuel = Math.min(100, fuel + 15);
+                        scoreEl.textContent = score;
+                        createBurst(bug.x, bug.y, '#facc15');
+                    } else {
+                        fuel = Math.max(0, fuel - 25);
+                        createBurst(bug.x, bug.y, '#ef4444');
+                    }
+                    bugs.splice(i, 1);
+                    return;
+                }
+            }
+        }
+
+        canvas.addEventListener('mousedown', (e) => handleInteraction(e.clientX, e.clientY));
+        canvas.addEventListener('touchstart', (e) => {
+            if (e.touches.length > 0) {
+                handleInteraction(e.touches[0].clientX, e.touches[0].clientY);
+            }
+        });
+
+        function startGame() {
+            score = 0;
+            fuel = 100;
+            bugs = [];
+            particles = [];
+            scoreEl.textContent = score;
+            gameActive = true;
+            screenOverlay.style.display = 'none';
+            // Trigger an immediate resize recalculation
+            resizeCanvas();
+            animate();
+        }
+
+        function gameOver() {
+            gameActive = false;
+            screenOverlay.style.display = 'flex';
+            overlayTitle.textContent = "The Lantern Faded";
+            overlayDesc.textContent = `Game Over! You kept the garden glowing. Total Score: ${score} points.`;
+            actionBtn.textContent = "Play Again";
+        }
+
+        function animate() {
+            if (!gameActive) return;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            fuel -= 0.14;
+            if (fuel <= 0) {
+                fuel = 0;
+                gameOver();
+            }
+            fuelBar.style.width = fuel + '%';
+
+            spawnTimer++;
+            if (spawnTimer > 35) {
+                bugs.push(new Bug());
+                spawnTimer = 0;
+            }
+
+            for (let i = bugs.length - 1; i >= 0; i--) {
+                const bug = bugs[i];
+                bug.update();
+                bug.draw();
+
+                if (bug.x > canvas.width * 0.72 && bug.y < canvas.height * 0.42) {
+                    if (bug.type === 'firefly') {
+                        fuel = Math.min(100, fuel + 5);
+                    }
+                    bugs.splice(i, 1);
+                }
+                else if (bug.x > canvas.width + 30 || bug.y < -30 || bug.y > canvas.height + 30) {
+                    bugs.splice(i, 1);
+                }
+            }
+
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.update();
+                p.draw();
+                if (p.alpha <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        actionBtn.addEventListener('click', startGame);
+        
+        // Initial configuration call
+        window.onload = resizeCanvas;
+    </script>
+</body>
+</html>

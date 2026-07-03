@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Lantern Glow: Firefly Overdrive</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+
+    <div id="game-wrapper">
+        <div id="hud">
+            <div class="hud-item shadow-box">
+                <span class="label">SCORE</span>
+                <span id="score">0</span>
+            </div>
+            <div class="hud-item shadow-box">
+                <span class="label">COMBO</span>
+                <span id="combo">x1</span>
+            </div>
+            <div id="energy-container" class="shadow-box">
+                <div id="energy-bar"></div>
+            </div>
+        </div>
+
+        <div id="wave-banner">WAVE 1</div>
+
+        <canvas id="gameCanvas"></canvas>
+
+        <div id="modal-overlay" class="active">
+            <div class="modal-content">
+                <h1 id="modal-title">LANTERN GLOW</h1>
+                <p id="modal-desc">Magical neon entities are escaping from the leaves! Harvest the glowing lights to supercharge the street lantern. Avoid destabilizing shadow moths.</p>
+                
+                <div id="score-summary" style="display: none;">
+                    <div class="summary-stat">Max Combo: <span id="max-combo-stat">0</span></div>
+                    <div class="summary-stat">Waves Cleared: <span id="waves-stat">0</span></div>
+                </div>
+
+                <button id="action-btn" class="btn-glow">
+                    <i class="fas fa-play"></i> <span id="btn-text">START HARVEST</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>
